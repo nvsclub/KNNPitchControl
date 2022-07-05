@@ -8,56 +8,123 @@ import matplotlib.pyplot as plt
 import lib.draw as draw
 
 def plot_pitch_control(frame, grid, control, dpi=144, subplot=None, savefig=None):
+    '''
+    Description
+    -------
+    Plots the pitch control visualization using the scatter function
+
+    Parameters
+    -------
+        frame: a dataframe containing the positions x, y of all players and the ball, and both bgcolor and edgecolor
+        grid: a dataframe containing the coordinates x, y used to generate the pitch control vector
+        control: a series containing the values of control for each coordinate in the grid
+        dpi: adjust image dpi
+        subplot: use to plot only in one subplot. None to ignore.
+        savefig: use to give a directory to save the figure. None to ignore.
+
+    Returns
+    -------
+        None
+    '''
+
+    # Add subplot if requested
     if subplot != None:
         plt.subplot(subplot)
+
+    # Drawing background
     draw.pitch(dpi=dpi)
+
+    # Plotting pitch control
     plt.scatter(grid.x, grid.y, s=10, marker='s', c=control, cmap='seismic', alpha=0.2)
-    plt.scatter(frame.x, frame.y, s=100, c=frame.bgcolor.values, edgecolors=frame.edgecolor)
     plt.clim(0, 1)
+    
+    # Plotting the elements of both teams
+    plt.scatter(frame.x, frame.y, s=100, c=frame.bgcolor.values, edgecolors=frame.edgecolor)
+
+    # End clauses to:
+    ## Save figure in a directory
     if savefig != None:
         plt.savefig(savefig, bbox_inches='tight')
         plt.clf()
+    ## Wait for the remaining subplots
     elif subplot != None:
         return
+    ## Plot the figure
     else:
         plt.show()
 
 class KNNPitchControl:
-    def __init__(self, delays=[0], distance_polinom=None, smoothing=None, team1_id='attack', k=1, n_jobs=-1):
+    '''
+    Description
+    -------
+    Class defining the KNN version of pitch control. Default parameters generate a Voronoi approximation.
+
+    Init Parameters
+    -------
+        lags [list(int)]: list of values indicating how many frames we extrapolate current speed. Each value generates a model, all models' outputs are summed to obtain the final result.
+        distance_basis: base value for decaing control with increased distance. None to ignore.
+        smoothing: size of the smoothing window. None to ignore.
+        team1_id: name of a team to define the label.
+        k: number of neighbors for the KNN model.
+        n_jobs: for multiprocessing purposes.
+    
+    Methods
+    -------
+        predict (xy -> dataframe containing the positions x, y of all players and the ball): returns an array with the pitch control values according to the predefined grid
+    '''
+
+    def __init__(self, lags=[0], distance_basis=None, smoothing=None, team1_id='attack', k=1, n_jobs=-1):
         self.model = KNeighborsClassifier(n_neighbors=k, n_jobs=n_jobs)
 
         self.smoothing = smoothing
-        self.delays = delays
-        self.grid = pd.DataFrame([[i/1.05, j/0.68] for i in range(106) for j in range(69)], columns=['x','y'])
-        self.distance_polinom = distance_polinom
+        self.lags = lags
+        self.distance_basis = distance_basis
         self.team1_id = team1_id
 
-    def predict(self, xy):
-        self.grid['control'] = 0
-        for delay in self.delays:
-            # Ignoring ball data
-            _xy = xy[xy.player!=0].copy()
-            _xy['x'] += delay * _xy.dx 
-            _xy['y'] += delay * _xy.dy 
+        self.grid = pd.DataFrame([[i/1.05, j/0.68] for i in range(106) for j in range(69)], columns=['x','y'])
 
+    def predict(self, xy):
+        # Initializing control variable as an array of 0s
+        self.grid['control'] = 0
+
+        # For each lag set by the user
+        for lag in self.lags:
+            # Copy player data (ignoring the ball)
+            _xy = xy[xy.player!=0].copy()
+
+            # Extrapolate position according to the lag defined
+            _xy['x'] += lag * _xy.dx 
+            _xy['y'] += lag * _xy.dy 
+
+            # Calculate the label according to the team1_id defined in innitialization
             _xy['team'] = (xy.team == self.team1_id) * 2 - 1
 
+            # Fitting the KNN model
             self.model.fit(_xy[['x','y']], _xy['team'])
 
-            if self.distance_polinom != None:
+            # Calculating distance_factor if parameter is enabled.
+            if self.distance_basis != None:
                 distances, _ = self.model.kneighbors(self.grid[['x', 'y']])
-                distance_factor = self.distance_polinom ** (1 - distances[:,0]/40)
+                distance_factor = self.distance_basis ** (1 - distances[:,0]/40)
             else:
                 distance_factor = 1
 
+            # Sum pitch control of the current lag to the total control
             self.grid['control'] += distance_factor * self.model.predict(self.grid[['x','y']])
 
+        # Calculate smoothed variable if parameter is enabled
         if self.smoothing != None:
             for coord in self.grid.x.unique():
+                # Across X axis
                 self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
+                # Across Y axis
                 self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
 
+        # Return the grid, normalized for the interval 0-1
         return self.grid['control'] / self.grid['control'].max()
+
+
+
 
 # Laurie Shaw's implementation of Spearman's pitch control
 class spearman_player(object):
@@ -269,7 +336,6 @@ def influence_function(locs_home, locs_away, locs_ball, t, player_index, locatio
   else:
     out = np.zeros(location.shape[0])
   return out
-
 
 class FernandezPitchControl:
     def __init__(self):
