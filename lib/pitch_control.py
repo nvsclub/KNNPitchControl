@@ -5,9 +5,10 @@ from scipy.stats import multivariate_normal as mvn
 from sklearn.neighbors import KNeighborsClassifier
 
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 import lib.draw as draw
 
-def plot_pitch_control(frame, grid, control, dpi=144, subplot=None, savefig=None):
+def plot_pitch_control(frame, grid, control, modelname=None, dpi=120, subplot=None, savefig=None):
     '''
     Description
     -------
@@ -18,6 +19,7 @@ def plot_pitch_control(frame, grid, control, dpi=144, subplot=None, savefig=None
         frame: a dataframe containing the positions x, y of all players and the ball, and both bgcolor and edgecolor
         grid: a dataframe containing the coordinates x, y used to generate the pitch control vector
         control: a series containing the values of control for each coordinate in the grid
+        modelname: text to write in the figure
         dpi: adjust image dpi
         subplot: use to plot only in one subplot. None to ignore.
         savefig: use to give a directory to save the figure. None to ignore.
@@ -35,11 +37,19 @@ def plot_pitch_control(frame, grid, control, dpi=144, subplot=None, savefig=None
     draw.pitch(dpi=dpi)
 
     # Plotting pitch control
-    plt.scatter(grid.x, grid.y, s=10, marker='s', c=control, cmap='seismic', alpha=0.2)
-    plt.clim(0, 1)
+    plt.scatter(grid.x, grid.y, s=20, marker='s', c=control, cmap='seismic', alpha=0.2)
+    plt.clim(control.min(), control.max())
     
     # Plotting the elements of both teams
-    plt.scatter(frame.x, frame.y, s=100, c=frame.bgcolor.values, edgecolors=frame.edgecolor)
+    plt.scatter(frame.x, frame.y, s=100, c=frame.bgcolor.values, edgecolors=frame.edgecolor, zorder=10)
+    _ball = frame[frame.player == 0]
+    plt.scatter(_ball.x, _ball.y, s=50, c=_ball.bgcolor.values, edgecolors=_ball.edgecolor, zorder=11)
+
+
+    # Writing name of the model on the figure
+    if modelname != None:
+        plt.text(1, 1, modelname, fontsize='xx-large',
+            path_effects=[pe.withStroke(linewidth=2, foreground="white")])
 
     # End clauses to:
     ## Save figure in a directory
@@ -82,6 +92,7 @@ class KNNPitchControl:
         self.team1_id = team1_id
 
         self.grid = pd.DataFrame([[i/1.05, j/0.68] for i in range(106) for j in range(69)], columns=['x','y'])
+        self.grid['model'] = 'KNNPitchControl'
 
     def predict(self, xy):
         # Initializing control variable as an array of 0s
