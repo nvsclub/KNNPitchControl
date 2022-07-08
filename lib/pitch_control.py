@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 import lib.draw as draw
 
-def plot_pitch_control(frame, grid, control, modelname=None, dpi=120, subplot=None, savefig=None):
+def plot_pitch_control(frame, grid, control, modelname=None, title=None, dpi=120, subplot=None, savefig=None):
     '''
     Description
     -------
@@ -50,6 +50,12 @@ def plot_pitch_control(frame, grid, control, modelname=None, dpi=120, subplot=No
     if modelname != None:
         plt.text(1, 1, modelname, fontsize='xx-large',
             path_effects=[pe.withStroke(linewidth=2, foreground="white")])
+    
+    # Writing a title
+    if title != None:
+        plt.text(1, 99, title, fontsize='xx-large', va='top',
+            path_effects=[pe.withStroke(linewidth=2, foreground="white")])
+
 
     # End clauses to:
     ## Save figure in a directory
@@ -125,11 +131,21 @@ class KNNPitchControl:
 
         # Calculate smoothed variable if parameter is enabled
         if self.smoothing != None:
-            for coord in self.grid.x.unique():
-                # Across X axis
-                self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
-                # Across Y axis
-                self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
+            if type(self.smoothing) == int:
+                for coord in self.grid.x.unique():
+                    # Across X axis
+                    self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
+                    # Across Y axis
+                    self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
+            else:
+                for coord in self.grid.x.unique():
+                    # Across X axis
+                    self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'
+                        ].rolling(self.smoothing[0], min_periods=1, center=True).mean().rolling(self.smoothing[1], min_periods=1, center=True).mean()
+                    # Across Y axis
+                    self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'
+                        ].rolling(self.smoothing[0], min_periods=1, center=True).mean().rolling(self.smoothing[1], min_periods=1, center=True).mean()
+            
 
         # Return the grid, normalized for the interval 0-1
         return self.grid['control'] / self.grid['control'].max()
