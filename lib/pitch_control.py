@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
+from scipy.ndimage import uniform_filter, gaussian_filter
 
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -37,11 +38,18 @@ def plot_pitch_control(frame, grid, control, modelname=None, title=None, dpi=120
     draw.pitch(dpi=dpi)
 
     # Plotting pitch control
-    plt.scatter(grid.x, grid.y, s=20, marker='s', c=control, cmap='seismic', alpha=0.2)
-    plt.clim(control.min(), control.max())
+    ## Old, deprecated way of plotting the grid
+    ## plt.scatter(grid.x, grid.y, s=20, marker='s', c=control, cmap='seismic', alpha=0.2)
+    ## plt.clim(control.min(), control.max())
+    plt.imshow(np.rot90(control.to_numpy().reshape((106,69))), 
+        extent=(0, 100, 0, 100), interpolation='bicubic',
+        vmin=control.min(),vmax=control.max(),
+        cmap='seismic',alpha=0.4, aspect=6.8/10.5, zorder=2)
+
     
     # Plotting the elements of both teams
-    plt.scatter(frame.x, frame.y, s=100, c=frame.bgcolor.values, edgecolors=frame.edgecolor, zorder=10)
+    _players = frame[frame.player != 0]
+    plt.scatter(_players.x, _players.y, s=100, c=_players.bgcolor.values, edgecolors=_players.edgecolor, zorder=10)
     _ball = frame[frame.player == 0]
     plt.scatter(_ball.x, _ball.y, s=50, c=_ball.bgcolor.values, edgecolors=_ball.edgecolor, zorder=11)
 
@@ -131,20 +139,13 @@ class KNNPitchControl:
 
         # Calculate smoothed variable if parameter is enabled
         if self.smoothing != None:
-            if type(self.smoothing) == int:
-                for coord in self.grid.x.unique():
-                    # Across X axis
-                    self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
-                    # Across Y axis
-                    self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'].rolling(self.smoothing, min_periods=1, center=True).mean()
-            else:
-                for coord in self.grid.x.unique():
-                    # Across X axis
-                    self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'
-                        ].rolling(self.smoothing[0], min_periods=1, center=True).mean().rolling(self.smoothing[1], min_periods=1, center=True).mean()
-                    # Across Y axis
-                    self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'
-                        ].rolling(self.smoothing[0], min_periods=1, center=True).mean().rolling(self.smoothing[1], min_periods=1, center=True).mean()
+            for coord in self.grid.x.unique():
+                # Across X axis
+                self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'
+                    ].rolling(self.smoothing, min_periods=1, center=True).mean().rolling(self.smoothing, min_periods=1, center=True).mean()
+                # Across Y axis
+                self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'
+                    ].rolling(self.smoothing, min_periods=1, center=True).mean().rolling(self.smoothing, min_periods=1, center=True).mean()
             
 
         # Return the grid, normalized for the interval 0-1
