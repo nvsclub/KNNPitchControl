@@ -53,6 +53,9 @@ def plot_pitch_control(frame, grid, control, modelname=None, title=None, dpi=120
     _ball = frame[frame.player == 0]
     plt.scatter(_ball.x, _ball.y, s=50, c=_ball.bgcolor.values, edgecolors=_ball.edgecolor, zorder=11)
 
+    # Plotting player speed
+    for _, player in _players.iterrows():
+        plt.plot([player.x, player.x + 10 * player.dx], [player.y, player.y + 10 * player.dy], marker='.', color=player.edgecolor, zorder=10)
 
     # Writing name of the model on the figure
     if modelname != None:
@@ -97,7 +100,7 @@ class KNNPitchControl:
         predict (xy -> dataframe containing the positions x, y of all players and the ball): returns an array with the pitch control values according to the predefined grid
     '''
 
-    def __init__(self, lags=[0], distance_basis=None, smoothing=None, team1_id='attack', k=1, n_jobs=-1):
+    def __init__(self, lags=[0], distance_basis=None, smoothing=None, team1_id='attack', k=1, n_jobs=1):
         self.model = KNeighborsClassifier(n_neighbors=k, n_jobs=n_jobs)
 
         self.smoothing = smoothing
@@ -142,10 +145,10 @@ class KNNPitchControl:
             for coord in self.grid.x.unique():
                 # Across X axis
                 self.grid.loc[self.grid.x == coord, 'control'] = self.grid.loc[self.grid.x == coord, 'control'
-                    ].rolling(self.smoothing, min_periods=1, center=True).mean().rolling(self.smoothing, min_periods=1, center=True).mean()
+                    ].rolling(self.smoothing, min_periods=1, center=True).mean()#.rolling(self.smoothing, min_periods=1, center=True).mean()
                 # Across Y axis
                 self.grid.loc[self.grid.y == coord, 'control'] = self.grid.loc[self.grid.y == coord, 'control'
-                    ].rolling(self.smoothing, min_periods=1, center=True).mean().rolling(self.smoothing, min_periods=1, center=True).mean()
+                    ].rolling(self.smoothing, min_periods=1, center=True).mean()#.rolling(self.smoothing, min_periods=1, center=True).mean()
             
 
         # Return the grid, normalized for the interval 0-1
